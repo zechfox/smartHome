@@ -1,0 +1,176 @@
+
+# Configure a default setup of Home Assistant (frontend, api, etc)
+default_config:
+
+# Text to speech
+tts:
+  - platform: google_translate
+
+group: !include groups.yaml
+automation: !include automations.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml
+http:
+  use_x_forwarded_for: true
+  trusted_proxies:
+    - 127.0.0.1
+    - ::1
+
+template:
+  - trigger:
+      - platform: state
+        entity_id: sensor.exchanger_warning_value
+          #- platform: time_pattern
+          #seconds: /15
+    sensor:
+      - name: "Exchanger Warning"
+        state: >- 
+          {% set mapper = { 0:'None',
+                            1:'EA Motor Abnormal',
+                            2:'SA Motor Abnormal',
+                            16:'Body Loop Abnormal',
+                            17:'Master-Slave Communication Abnormal',
+                            18:'Body Loop(Slave) Abnormal',
+                            19:'EA Motor(Slave) Abnormal',
+                            20:'SA Motor(Slave) Abnormal',
+                            14:'LCD Communication Abnormal',
+                          } %}
+          {% set state = states('sensor.exchanger_warning_value') | int %}
+          {% set id = mapper[state] if state in mapper else 'Unknown' %}
+          {{ id }}
+
+modbus:
+  - name: UnitDoorLocker
+    type: tcp
+    host: 10.0.0.30
+    port: 502
+    switches:
+      - name: unit_door_locker1
+        write_type: coil
+        slave: 1
+        address: 2
+        command_on: 1
+        command_off: 0
+        verify:
+            address: 2
+            delay: 1
+            state_on: 1
+            state_off: 0
+      - name: unit_door_locker2
+        write_type: coil
+        slave: 1
+        address: 0
+        command_on: 1
+        command_off: 0
+        verify:
+            address: 0
+            delay: 10
+            state_on: 1
+            state_off: 0
+
+  - name: panasonic_exchanger
+    type: tcp
+    host: 10.0.0.22
+    port: 8899
+    switches:
+      - name: exchanger_state
+        write_type: holding
+        slave: 1
+        address: 1
+        command_on: 1
+        command_off: 0
+        verify:
+            address: 1
+            delay: 1
+            state_on: 1
+            state_off: 0
+
+    sensors:
+      - name: exchanger_warning_value
+        input_type: holding
+        data_type: int16
+        slave: 1
+        address: 15
+        scan_interval: 10
+      - name: exchanger_filter_life
+        input_type: holding
+        slave: 1
+        address: 13
+        data_type: int16
+        unit_of_measurement: H
+        scan_interval: 10
+      - name: exchanger_timer
+        input_type: holding
+        slave: 1
+        address: 17
+        data_type: custom
+        count: 3
+        structure: "=BBBBBB"
+        scan_interval: 10
+      - name: exchanger_mode
+        input_type: holding
+        slave: 1
+        data_type: int16
+        address: 2
+        scan_interval: 10
+      - name: exchanger_speed
+        input_type: holding
+        data_type: int16
+        slave: 1
+        address: 3
+        scan_interval: 10
+      - name: exchanger_filter_period
+        input_type: holding
+        slave: 1
+        address: 14
+        data_type: int16
+        scan_interval: 10
+
+input_select:
+  exchanger_mode:
+    name: Exchanger Mode
+    options:
+      - "Full Exchange"
+      - "Normal"
+  exchanger_speed:
+    name: Exchanger Speed
+    options:
+      - "Weak"
+      - "Strong"
+  exchanger_filter_period:
+    name: Exchanger Filter Period
+    options:
+      - "120D"
+      - "150D"
+      - "180D"
+    initial: 120D
+  exchanger_time_on:
+    name: Exchanger Time ON
+    options:
+      - "ON"
+      - "OFF"
+    initial: "OFF"
+  exchanger_time_off:
+    name: Exchanger Time OFF
+    options:
+      - "ON"
+      - "OFF"
+    initial: "OFF"
+
+input_datetime:
+  exchanger_network_time:
+    name: Exchanger Network Time
+    has_date: true
+    has_time: true
+  exchanger_on_time:
+    name: Exchanger ON Time
+    has_date: false
+    has_time: true
+  exchanger_off_time:
+    name: Exchanger OFF Time
+    has_date: false
+    has_time: true
+
+
+
+

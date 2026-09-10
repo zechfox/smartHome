@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>smartHome</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --surface: #1a1d24;
+    --surface-hover: #21252e;
+    --border: #2a2f3a;
+    --text: #e8eaf0;
+    --muted: #8b93a7;
+    --accent: #4f8cff;
+    --accent-soft: rgba(79, 140, 255, 0.15);
+    --on: #34c77b;
+    --off: #4a5163;
+    --danger: #ef5f5f;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: rgba(15, 17, 21, 0.92);
+    backdrop-filter: blur(8px);
+    z-index: 10;
+  }
+  header h1 { font-size: 18px; margin: 0; font-weight: 600; letter-spacing: 0.2px; }
+  header .spacer { flex: 1; }
+  #connection {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+  #connection .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); }
+  #connection.live .dot { background: var(--on); }
+  #logout {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  #logout:hover { color: var(--text); border-color: var(--muted); }
+  main { padding: 22px; max-width: 1200px; margin: 0 auto; }
+  section { margin-bottom: 30px; }
+  h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--muted);
+    font-weight: 600;
+    margin: 0 0 12px;
+  }
+  h2 .count { color: var(--off); font-weight: 500; margin-left: 4px; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 14px;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .card:hover { border-color: #384051; }
+  .card.offline { opacity: 0.5; }
+  .card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .card h3 { font-size: 15px; margin: 0 0 3px; font-weight: 600; }
+  .meta { color: var(--muted); font-size: 12px; margin: 0; }
+  .state-line {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-top: 14px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .state-line .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--off); }
+  .card.on .state-line .dot { background: var(--on); }
+  .card.offline .state-line .dot { background: var(--danger); }
+  .value { font-size: 30px; font-weight: 600; letter-spacing: -0.5px; line-height: 1.1; }
+  .value .unit { font-size: 14px; color: var(--muted); font-weight: 500; margin-left: 4px; }
+  .value.unavailable { color: var(--danger); font-size: 16px; }
+  .updated { margin-top: 10px; font-size: 11px; color: var(--off); }
+  .toggle {
+    position: relative;
+    width: 48px;
+    height: 27px;
+    border-radius: 999px;
+    border: none;
+    background: var(--off);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s ease;
+    padding: 0;
+  }
+  .toggle span {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 21px;
+    height: 21px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.15s ease;
+  }
+  .toggle.on { background: var(--on); }
+  .toggle.on span { transform: translateX(21px); }
+  .toggle:disabled { opacity: 0.5; cursor: wait; }
+  .empty { color: var(--off); font-size: 13px; }
+  #login {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 12, 16, 0.85);
+    backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 20px;
+  }
+  #login.hidden { display: none; }
+  #login form {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 26px;
+    width: 100%;
+    max-width: 360px;
+  }
+  #login h2 { margin-bottom: 6px; }
+  #login p { color: var(--muted); font-size: 13px; margin: 0 0 16px; }
+  #login input {
+    width: 100%;
+    padding: 11px 13px;
+    border-radius: 9px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    margin-bottom: 12px;
+  }
+  #login input:focus { outline: none; border-color: var(--accent); }
+  #login button {
+    width: 100%;
+    padding: 11px;
+    border: none;
+    border-radius: 9px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  #login-error { color: var(--danger); font-size: 12px; min-height: 15px; margin: 10px 0 0; }
+  #toast {
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translate(-50%, 80px);
+    background: var(--danger);
+    color: #fff;
+    padding: 11px 18px;
+    border-radius: 10px;
+    font-size: 13px;
+    max-width: 90vw;
+    transition: transform 0.2s ease;
+    z-index: 200;
+  }
+  #toast.visible { transform: translate(-50%, 0); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>smartHome</h1>
+  <div class="spacer"></div>
+  <span id="connection"><span class="dot"></span><span id="connection-label">connecting</span></span>
+  <button id="logout" type="button">Lock</button>
+</header>
+
+<main>
+  <section>
+    <h2>Switches <span id="switch-count" class="count"></span></h2>
+    <div id="switches" class="grid"></div>
+  </section>
+  <section>
+    <h2>Sensors <span id="sensor-count" class="count"></span></h2>
+    <div id="sensors" class="grid"></div>
+  </section>
+</main>
+
+<div id="login" class="hidden">
+  <form id="login-form">
+    <h2>API token</h2>
+    <p>Paste the api_token from your config.yaml.</p>
+    <input id="token-input" type="password" autocomplete="current-password" placeholder="Token">
+    <button type="submit">Unlock</button>
+    <p id="login-error"></p>
+  </form>
+</div>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+
+const TOKEN_KEY = "smart-home-token";
+const POLL_INTERVAL = 5000;
+const MAX_WS_DELAY = 30000;
+
+let token = localStorage.getItem(TOKEN_KEY) || "";
+let entities = new Map();
+let socket = null;
+let pollTimer = null;
+let wsRetryTimer = null;
+let wsDelay = 1000;
+
+const $ = (selector) => document.querySelector(selector);
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  })[char]);
+}
+
+function formatValue(entity) {
+  const state = entity.state;
+  if (state === null || state === undefined) return "—";
+  if (Array.isArray(state)) return state.join(" · ");
+  if (typeof state === "number" && !Number.isInteger(state)) return state.toFixed(2);
+  return String(state);
+}
+
+function relativeTime(iso) {
+  if (!iso) return "";
+  const seconds = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
+  if (seconds < 5) return "just now";
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  return `${Math.floor(minutes / 60)}h ago`;
+}
+
+function switchCard(entity) {
+  const on = entity.state === "on";
+  const classes = ["card", on ? "on" : "", entity.available ? "" : "offline"].filter(Boolean).join(" ");
+  const label = entity.available ? (on ? "On" : "Off") : "Unavailable";
+  return `
+    <article class="${classes}" data-entity-id="${escapeHtml(entity.entity_id)}">
+      <div class="card-head">
+        <div>
+          <h3>${escapeHtml(entity.name)}</h3>
+          <p class="meta">${escapeHtml(entity.attributes.device || "")}</p>
+        </div>
+        <button class="toggle ${on ? "on" : ""}" type="button" data-action="toggle"
+                aria-label="Toggle ${escapeHtml(entity.name)}" ${entity.available ? "" : "disabled"}>
+          <span></span>
+        </button>
+      </div>
+      <div class="state-line"><span class="dot"></span>${label}</div>
+    </article>`;
+}
+
+function sensorCard(entity) {
+  const classes = ["card", entity.available ? "" : "offline"].filter(Boolean).join(" ");
+  const unit = entity.attributes.unit_of_measurement;
+  const value = entity.available
+    ? `${escapeHtml(formatValue(entity))}${unit ? `<span class="unit">${escapeHtml(unit)}</span>` : ""}`
+    : "Unavailable";
+  return `
+    <article class="${classes}" data-entity-id="${escapeHtml(entity.entity_id)}">
+      <h3>${escapeHtml(entity.name)}</h3>
+      <p class="meta">${escapeHtml(entity.attributes.device || "")}</p>
+      <div class="value ${entity.available ? "" : "unavailable"}">${value}</div>
+      <div class="updated">${escapeHtml(relativeTime(entity.last_updated))}</div>
+    </article>`;
+}
+
+function renderGroup(domain, container, renderer, emptyText) {
+  const list = [...entities.values()]
+    .filter((entity) => entity.domain === domain)
+    .sort((a, b) => a.name.localeCompare(b.name));
+  if (!list.length) {
+    container.innerHTML = `<p class="empty">${emptyText}</p>`;
+    return;
+  }
+  container.innerHTML = list.map(renderer).join("");
+}
+
+function render() {
+  renderGroup("switch", $("#switches"), switchCard, "No switches configured.");
+  renderGroup("sensor", $("#sensors"), sensorCard, "No sensors configured.");
+  $("#switch-count").textContent = [...entities.values()].filter((e) => e.domain === "switch").length;
+  $("#sensor-count").textContent = [...entities.values()].filter((e) => e.domain === "sensor").length;
+}
+
+function updateEntity(entity) {
+  entities.set(entity.entity_id, entity);
+  const selector = `[data-entity-id="${CSS.escape(entity.entity_id)}"]`;
+  const card = document.querySelector(selector);
+  if (!card) {
+    render();
+    return;
+  }
+  card.outerHTML = entity.domain === "switch" ? switchCard(entity) : sensorCard(entity);
+}
+
+function setConnection(live, label) {
+  const element = $("#connection");
+  element.classList.toggle("live", live);
+  $("#connection-label").textContent = label || (live ? "live" : "offline");
+}
+
+function toast(message) {
+  const element = $("#toast");
+  element.textContent = message;
+  element.classList.add("visible");
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => element.classList.remove("visible"), 4000);
+}
+
+async function api(path, options = {}) {
+  const response = await fetch(path, {
+    ...options,
+    headers: { Authorization: `Bearer ${token}`, ...(options.headers || {}) },
+  });
+  if (response.status === 401) {
+    lock("Invalid token");
+    throw new Error("unauthorized");
+  }
+  if (!response.ok) {
+    let detail = response.statusText;
+    try { detail = (await response.json()).detail || detail; } catch (_) { /* ignore */ }
+    throw new Error(detail);
+  }
+  return response.status === 204 ? null : response.json();
+}
+
+async function refresh() {
+  try {
+    const list = await api("/api/entities");
+    entities = new Map(list.map((entity) => [entity.entity_id, entity]));
+    render();
+    setConnection(true, "polling");
+  } catch (error) {
+    setConnection(false, "offline");
+  }
+}
+
+function startPolling() {
+  if (!pollTimer) pollTimer = setInterval(refresh, POLL_INTERVAL);
+}
+
+function stopPolling() {
+  clearInterval(pollTimer);
+  pollTimer = null;
+}
+
+function connectSocket() {
+  clearTimeout(wsRetryTimer);
+  if (socket) {
+    socket.onclose = null;
+    socket.close();
+  }
+  const protocol = location.protocol === "https:" ? "wss" : "ws";
+  socket = new WebSocket(`${protocol}://${location.host}/ws?token=${encodeURIComponent(token)}`);
+  socket.onopen = () => {
+    wsDelay = 1000;
+    stopPolling();
+    setConnection(true, "live");
+  };
+  socket.onmessage = (event) => {
+    const message = JSON.parse(event.data);
+    if (message.type === "snapshot") {
+      entities = new Map(message.entities.map((entity) => [entity.entity_id, entity]));
+      render();
+    } else if (message.type === "state_changed") {
+      updateEntity(message.entity);
+    }
+  };
+  socket.onclose = () => {
+    setConnection(false, "reconnecting");
+    startPolling();
+    wsRetryTimer = setTimeout(connectSocket, wsDelay);
+    wsDelay = Math.min(wsDelay * 2, MAX_WS_DELAY);
+  };
+  socket.onerror = () => socket.close();
+}
+
+function lock(message) {
+  localStorage.removeItem(TOKEN_KEY);
+  token = "";
+  if (socket) {
+    socket.onclose = null;
+    socket.close();
+    socket = null;
+  }
+  stopPolling();
+  setConnection(false, "locked");
+  $("#login").classList.remove("hidden");
+  $("#login-error").textContent = message || "";
+  $("#token-input").value = "";
+  $("#token-input").focus();
+}
+
+async function bootstrap() {
+  try {
+    const list = await api("/api/entities");
+    entities = new Map(list.map((entity) => [entity.entity_id, entity]));
+    render();
+    connectSocket();
+  } catch (error) {
+    if (error.message !== "unauthorized") {
+      setConnection(false, "offline");
+      startPolling();
+    }
+  }
+}
+
+document.addEventListener("click", async (event) => {
+  const button = event.target.closest('[data-action="toggle"]');
+  if (!button) return;
+  const card = button.closest("[data-entity-id]");
+  const entity = entities.get(card.dataset.entityId);
+  if (!entity) return;
+  const target = entity.state === "on" ? "off" : "on";
+  button.disabled = true;
+  try {
+    const updated = await api(`/api/entities/${encodeURIComponent(entity.entity_id)}/set`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ state: target }),
+    });
+    updateEntity(updated);
+  } catch (error) {
+    if (error.message !== "unauthorized") toast(`${entity.name}: ${error.message}`);
+    button.disabled = false;
+  }
+});
+
+$("#login-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const value = $("#token-input").value.trim();
+  if (!value) return;
+  token = value;
+  localStorage.setItem(TOKEN_KEY, token);
+  $("#login").classList.add("hidden");
+  bootstrap();
+});
+
+$("#logout").addEventListener("click", () => lock(""));
+
+setInterval(() => { if (!document.hidden) render(); }, 30000);
+
+if (token) bootstrap(); else lock("");
+</script>
+</body>
+</html>

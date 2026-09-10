@@ -1,0 +1,6 @@
+fastapi>=0.110,<1
+uvicorn>=0.29,<1
+websockets>=12
+pymodbus>=3.6,<4
+PyYAML>=6.0
+pydantic>=2.6,<3

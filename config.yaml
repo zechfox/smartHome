@@ -1,0 +1,82 @@
+# smartHome configuration
+# Ported from the Home Assistant configuration.yaml.
+#
+# Replace api_token with a long random string before exposing this service,
+# or set the SMART_HOME_TOKEN environment variable instead.
+
+server:
+  host: 0.0.0.0
+  port: 8080
+  api_token: "change-me-to-a-long-random-string"
+  shutdown_timeout: 10
+
+modbus:
+  - name: unit_door_locker
+    host: 10.0.0.30
+    port: 502
+    slave: 1
+    switches:
+      - id: unit_door_locker1
+        name: Unit Door Locker 1
+        type: coil
+        address: 2
+        command_on: 1
+        command_off: 0
+        verify_delay: 1
+        scan_interval: 30
+      - id: unit_door_locker2
+        name: Unit Door Locker 2
+        type: coil
+        address: 0
+        command_on: 1
+        command_off: 0
+        verify_delay: 10
+        scan_interval: 30
+
+  - name: panasonic_exchanger
+    host: 10.0.0.22
+    port: 8899
+    slave: 1
+    switches:
+      - id: exchanger_state
+        name: Exchanger State
+        type: holding
+        address: 1
+        command_on: 1
+        command_off: 0
+        verify_delay: 1
+        scan_interval: 30
+    sensors:
+      - id: exchanger_warning_value
+        name: Exchanger Warning Value
+        address: 15
+        data_type: int16
+        scan_interval: 10
+      - id: exchanger_filter_life
+        name: Exchanger Filter Life
+        address: 13
+        data_type: int16
+        unit: H
+        scan_interval: 10
+      - id: exchanger_timer
+        name: Exchanger Timer
+        address: 17
+        data_type: custom
+        count: 3
+        struct: "=BBBBBB"
+        scan_interval: 10
+      - id: exchanger_mode
+        name: Exchanger Mode
+        address: 2
+        data_type: int16
+        scan_interval: 10
+      - id: exchanger_speed
+        name: Exchanger Speed
+        address: 3
+        data_type: int16
+        scan_interval: 10
+      - id: exchanger_filter_period
+        name: Exchanger Filter Period
+        address: 14
+        data_type: int16
+        scan_interval: 10

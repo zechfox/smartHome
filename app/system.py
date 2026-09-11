@@ -7,7 +7,14 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
-from app.config import AppConfig, ModbusDeviceConfig
+from app.config import (
+    AppConfig,
+    ModbusDeviceConfig,
+    SensorConfig,
+    SwitchConfig,
+    save_config,
+    validated_update,
+)
 from app.modbus.client import ModbusDevice
 from app.modbus.sensor import SensorPoller
 from app.modbus.switch import ModbusSwitch
@@ -16,6 +23,38 @@ from app.state import Entity, StateStore
 logger = logging.getLogger(__name__)
 
 DeviceFactory = Callable[[ModbusDeviceConfig], ModbusDevice]
+
+SWITCH_FIELDS = frozenset(
+    {"address", "command_on", "command_off", "verify_delay", "scan_interval", "name"}
+)
+SENSOR_FIELDS = frozenset({"address", "scan_interval", "scale", "precision", "unit", "name"})
+DEVICE_FIELDS = frozenset({"host", "port", "slave", "timeout", "reconnect_interval"})
+
+
+def _switch_attributes(device_name: str, cfg: SwitchConfig) -> dict[str, Any]:
+    return {
+        "device": device_name,
+        "register_type": cfg.type,
+        "address": cfg.address,
+        "command_on": cfg.command_on,
+        "command_off": cfg.command_off,
+        "verify_delay": cfg.verify_delay,
+        "scan_interval": cfg.scan_interval,
+    }
+
+
+def _sensor_attributes(device_name: str, cfg: SensorConfig) -> dict[str, Any]:
+    attributes: dict[str, Any] = {
+        "device": device_name,
+        "address": cfg.address,
+        "data_type": cfg.data_type,
+        "scan_interval": cfg.scan_interval,
+        "scale": cfg.scale,
+        "precision": cfg.precision,
+    }
+    if cfg.unit:
+        attributes["unit_of_measurement"] = cfg.unit
+    return attributes
 
 
 class SmartHomeSystem:
@@ -86,6 +125,61 @@ class SmartHomeSystem:
             for device in self.devices.values()
         ]
 
+    def list_devices(self) -> list[dict[str, Any]]:
+        return [
+            {
+                "name": device.name,
+                "host": device.config.host,
+                "port": device.config.port,
+                "slave": device.config.slave,
+                "timeout": device.config.timeout,
+                "reconnect_interval": device.config.reconnect_interval,
+                "connected": device.connected,
+            }
+            for device in self.devices.values()
+        ]
+
+    async def update_entity(self, entity_id: str, updates: dict[str, Any]) -> Entity:
+        if entity_id.startswith("switch."):
+            switch = self.switches[entity_id]
+            if "scan_interval" in updates and updates["scan_interval"] is None:
+                raise ValueError("scan_interval cannot be null for a switch")
+            validated_update(switch.config, updates, allowed=SWITCH_FIELDS)
+            attributes = _switch_attributes(switch.device.name, switch.config)
+            await self.store.update_entity_meta(
+                entity_id, name=switch.config.display_name, attributes=attributes
+            )
+            switch.notify_change()
+        else:
+            poller = self.sensors[entity_id]
+            validated_update(poller.sensor, updates, allowed=SENSOR_FIELDS)
+            attributes = _sensor_attributes(poller.device.name, poller.sensor)
+            await self.store.update_entity_meta(
+                entity_id, name=poller.sensor.display_name, attributes=attributes
+            )
+            poller.notify_change()
+
+        save_config(self.config)
+        entity = self.store.get(entity_id)
+        assert entity is not None
+        return entity
+
+    async def update_device(self, device_name: str, updates: dict[str, Any]) -> dict[str, Any]:
+        device = self.devices[device_name]
+        validated_update(device.config, updates, allowed=DEVICE_FIELDS)
+        rebuild = bool({"host", "port", "timeout"} & updates.keys())
+        await device.reconfigure(rebuild)
+        save_config(self.config)
+        return {
+            "name": device.name,
+            "host": device.config.host,
+            "port": device.config.port,
+            "slave": device.config.slave,
+            "timeout": device.config.timeout,
+            "reconnect_interval": device.config.reconnect_interval,
+            "connected": device.connected,
+        }
+
     def _build_entities(self) -> None:
         for device_config in self.config.modbus:
             device = self._device_factory(device_config)
@@ -98,30 +192,19 @@ class SmartHomeSystem:
                         entity_id=entity_id,
                         name=switch_config.display_name,
                         domain="switch",
-                        attributes={
-                            "device": device_config.name,
-                            "register_type": switch_config.type,
-                            "address": switch_config.address,
-                        },
+                        attributes=_switch_attributes(device_config.name, switch_config),
                     )
                 )
                 self.switches[entity_id] = ModbusSwitch(device, switch_config, self.store)
 
             for sensor_config in device_config.sensors:
                 entity_id = f"sensor.{sensor_config.id}"
-                attributes: dict[str, Any] = {
-                    "device": device_config.name,
-                    "address": sensor_config.address,
-                    "data_type": sensor_config.data_type,
-                }
-                if sensor_config.unit:
-                    attributes["unit_of_measurement"] = sensor_config.unit
                 self.store.add(
                     Entity(
                         entity_id=entity_id,
                         name=sensor_config.display_name,
                         domain="sensor",
-                        attributes=attributes,
+                        attributes=_sensor_attributes(device_config.name, sensor_config),
                     )
                 )
                 self.sensors[entity_id] = SensorPoller(device, sensor_config, self.store)

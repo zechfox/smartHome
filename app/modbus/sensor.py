@@ -19,10 +19,19 @@ class SensorPoller:
         self.sensor = sensor
         self.store = store
         self.entity_id = f"sensor.{sensor.id}"
+        self._wake = asyncio.Event()
+
+    def notify_change(self) -> None:
+        self._wake.set()
 
     async def run(self) -> None:
         while True:
-            await asyncio.sleep(self.sensor.scan_interval)
+            try:
+                await asyncio.wait_for(self._wake.wait(), timeout=self.sensor.scan_interval)
+            except asyncio.TimeoutError:
+                pass
+            finally:
+                self._wake.clear()
             await self.poll_once()
 
     async def poll_once(self) -> None:

@@ -88,6 +88,8 @@
     margin: 0 0 12px;
   }
   h2 .count { color: var(--off); font-weight: 500; margin-left: 4px; }
+  .section-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .section-head h2 { margin: 0; }
   .grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
@@ -105,6 +107,13 @@
   .card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
   .card h3 { font-size: 15px; margin: 0 0 3px; font-weight: 600; }
   .meta { color: var(--muted); font-size: 12px; margin: 0; }
+  .entity-id {
+    margin: 4px 0 0;
+    font-size: 11px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color: var(--off);
+    user-select: all;
+  }
   .state-line {
     display: flex;
     align-items: center;
@@ -146,6 +155,111 @@
   .toggle.on span { transform: translateX(21px); }
   .toggle:disabled { opacity: 0.5; cursor: wait; }
   .empty { color: var(--off); font-size: 13px; }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: none;
+    color: var(--off);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+  }
+  .icon-btn:hover { color: var(--text); background: var(--surface-hover); border-color: var(--border); }
+  .card-actions { display: flex; align-items: center; gap: 8px; }
+  .modal { position: fixed; inset: 0; z-index: 50; }
+  .modal.hidden { display: none; }
+  .field-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+    margin-top: 14px;
+  }
+  .field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+  .field.wide { grid-column: 1 / -1; }
+  .field span {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.9px;
+    color: var(--muted);
+  }
+  .field input {
+    width: 100%;
+    padding: 9px 11px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 13px;
+    font-family: inherit;
+  }
+  .field input:focus { outline: none; border-color: var(--accent); }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; }
+  .btn-primary {
+    padding: 9px 16px;
+    border: none;
+    border-radius: 8px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-primary:disabled { opacity: 0.5; cursor: wait; }
+  .btn-ghost {
+    padding: 9px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: none;
+    color: var(--muted);
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .btn-ghost:hover { color: var(--text); border-color: var(--muted); }
+  .modal {
+    background: rgba(10, 12, 16, 0.7);
+    backdrop-filter: blur(5px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 60;
+  }
+  .modal-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px;
+    width: 100%;
+    max-width: 420px;
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    animation: modal-in 0.18s ease;
+  }
+  .modal-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .modal-head h2 { margin: 0; }
+  .modal-head .entity-id { margin: 6px 0 0; }
+  .modal-note { color: var(--muted); font-size: 12px; line-height: 1.5; margin: 14px 0 0; }
+  .modal-actions { margin-top: 18px; }
+  @keyframes modal-in {
+    from { opacity: 0; transform: translateY(8px) scale(0.98); }
+    to { opacity: 1; transform: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .modal-card { animation: none; }
+  }
   #login {
     position: fixed;
     inset: 0;
@@ -235,6 +349,50 @@
   </form>
 </div>
 
+<div id="entity-dialog" class="modal hidden" aria-hidden="true">
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="entity-dialog-title">
+    <div class="modal-head">
+      <div>
+        <h2 id="entity-dialog-title">Edit entity</h2>
+        <p class="entity-id" id="entity-dialog-id"></p>
+      </div>
+      <button class="icon-btn" type="button" data-action="close-entity" aria-label="Close dialog">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+    <form id="entity-form">
+      <div class="field-grid" id="entity-fields"></div>
+      <p class="modal-note">Saved to config.yaml on the server.</p>
+      <div class="modal-actions">
+        <button type="button" class="btn-ghost" data-action="close-entity">Cancel</button>
+        <button type="submit" class="btn-primary" id="entity-save">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="device-dialog" class="modal hidden" aria-hidden="true">
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="device-dialog-title">
+    <div class="modal-head">
+      <div>
+        <h2 id="device-dialog-title">Edit device</h2>
+        <p class="entity-id" id="device-dialog-id"></p>
+      </div>
+      <button class="icon-btn" type="button" data-action="close-device" aria-label="Close dialog">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+    <form id="device-form">
+      <div class="field-grid" id="device-fields"></div>
+      <p class="modal-note">Saved to config.yaml on the server.</p>
+      <div class="modal-actions">
+        <button type="button" class="btn-ghost" data-action="close-device">Cancel</button>
+        <button type="submit" class="btn-primary" id="device-save">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -248,10 +406,14 @@ const MAX_WS_DELAY = 30000;
 let token = localStorage.getItem(TOKEN_KEY) || "";
 let viewMode = localStorage.getItem(VIEW_KEY) || "device";
 let entities = new Map();
+let devices = [];
 let socket = null;
 let pollTimer = null;
 let wsRetryTimer = null;
 let wsDelay = 1000;
+let lastFocused = null;
+let editingEntityId = null;
+let editingDeviceName = null;
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -279,6 +441,8 @@ function relativeTime(iso) {
   return `${Math.floor(minutes / 60)}h ago`;
 }
 
+const GEAR_ICON = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`;
+
 function switchCard(entity) {
   const on = entity.state === "on";
   const classes = ["card", on ? "on" : "", entity.available ? "" : "offline"].filter(Boolean).join(" ");
@@ -289,11 +453,16 @@ function switchCard(entity) {
         <div>
           <h3>${escapeHtml(entity.name)}</h3>
           <p class="meta">${escapeHtml(entity.attributes.device || "")}</p>
+          <p class="entity-id">${escapeHtml(entity.entity_id)}</p>
         </div>
-        <button class="toggle ${on ? "on" : ""}" type="button" data-action="toggle"
-                aria-label="Toggle ${escapeHtml(entity.name)}" ${entity.available ? "" : "disabled"}>
-          <span></span>
-        </button>
+        <div class="card-actions">
+          <button class="icon-btn" type="button" data-action="edit-entity"
+                  aria-label="Edit ${escapeHtml(entity.name)}">${GEAR_ICON}</button>
+          <button class="toggle ${on ? "on" : ""}" type="button" data-action="toggle"
+                  aria-label="Toggle ${escapeHtml(entity.name)}" ${entity.available ? "" : "disabled"}>
+            <span></span>
+          </button>
+        </div>
       </div>
       <div class="state-line"><span class="dot"></span>${label}</div>
     </article>`;
@@ -307,8 +476,15 @@ function sensorCard(entity) {
     : "Unavailable";
   return `
     <article class="${classes}" data-entity-id="${escapeHtml(entity.entity_id)}">
-      <h3>${escapeHtml(entity.name)}</h3>
-      <p class="meta">${escapeHtml(entity.attributes.device || "")}</p>
+      <div class="card-head">
+        <div>
+          <h3>${escapeHtml(entity.name)}</h3>
+          <p class="meta">${escapeHtml(entity.attributes.device || "")}</p>
+          <p class="entity-id">${escapeHtml(entity.entity_id)}</p>
+        </div>
+        <button class="icon-btn" type="button" data-action="edit-entity"
+                aria-label="Edit ${escapeHtml(entity.name)}">${GEAR_ICON}</button>
+      </div>
       <div class="value ${entity.available ? "" : "unavailable"}">${value}</div>
       <div class="updated">${escapeHtml(relativeTime(entity.last_updated))}</div>
     </article>`;
@@ -359,9 +535,13 @@ function render() {
   container.innerHTML = [...groups.entries()]
     .map(([key, list]) => {
       const sorted = sortGroup(list);
+      const heading = `<h2>${escapeHtml(sectionTitle(key))} <span class="count">${sorted.length}</span></h2>`;
+      const head = viewMode === "device"
+        ? `<div class="section-head">${heading}<button class="icon-btn" type="button" data-action="edit-device" data-device="${escapeHtml(key)}" aria-label="Edit device ${escapeHtml(sectionTitle(key))}">${GEAR_ICON}</button></div>`
+        : heading;
       return `
     <section>
-      <h2>${escapeHtml(sectionTitle(key))} <span class="count">${sorted.length}</span></h2>
+      ${head}
       <div class="grid">${sorted.map(cardFor).join("")}</div>
     </section>`;
     })
@@ -470,6 +650,7 @@ function lock(message) {
     socket = null;
   }
   stopPolling();
+  hideDialogs();
   setConnection(false, "locked");
   $("#login").classList.remove("hidden");
   $("#login-error").textContent = message || "";
@@ -483,6 +664,7 @@ async function bootstrap() {
     entities = new Map(list.map((entity) => [entity.entity_id, entity]));
     render();
     connectSocket();
+    loadDevices().catch(() => { devices = []; });
   } catch (error) {
     if (error.message !== "unauthorized") {
       setConnection(false, "offline");
@@ -509,6 +691,298 @@ document.addEventListener("click", async (event) => {
   } catch (error) {
     if (error.message !== "unauthorized") toast(`${entity.name}: ${error.message}`);
     button.disabled = false;
+  }
+});
+
+const DEVICE_FIELDS = [
+  { key: "host", label: "Host", type: "text" },
+  { key: "port", label: "Port", type: "int" },
+  { key: "slave", label: "Slave", type: "int" },
+  { key: "timeout", label: "Timeout (s)", type: "number" },
+  { key: "reconnect_interval", label: "Reconnect (s)", type: "number" },
+];
+
+const ENTITY_FIELDS = {
+  switch: [
+    { key: "name", label: "Name", type: "text", wide: true },
+    { key: "address", label: "Address", type: "int", attr: "address" },
+    { key: "command_on", label: "Command on", type: "int", attr: "command_on" },
+    { key: "command_off", label: "Command off", type: "int", attr: "command_off" },
+    { key: "verify_delay", label: "Verify delay (s)", type: "number", attr: "verify_delay" },
+    { key: "scan_interval", label: "Scan interval (s)", type: "number", attr: "scan_interval" },
+  ],
+  sensor: [
+    { key: "name", label: "Name", type: "text", wide: true },
+    { key: "address", label: "Address", type: "int", attr: "address" },
+    { key: "scan_interval", label: "Scan interval (s)", type: "number", attr: "scan_interval" },
+    { key: "scale", label: "Scale", type: "number", attr: "scale" },
+    { key: "precision", label: "Precision", type: "int", attr: "precision", nullable: true },
+    { key: "unit", label: "Unit", type: "text", attr: ["unit_of_measurement", "unit"], nullable: true },
+  ],
+};
+
+function fieldValue(entity, field) {
+  if (field.key === "name") return entity.name === null || entity.name === undefined ? "" : String(entity.name);
+  const keys = Array.isArray(field.attr) ? field.attr : [field.attr];
+  for (const key of keys) {
+    const value = entity.attributes ? entity.attributes[key] : undefined;
+    if (value !== undefined && value !== null) return String(value);
+  }
+  return "";
+}
+
+function parseFieldValue(field, raw) {
+  if (field.type === "text") return raw;
+  const num = Number(raw);
+  if (!Number.isFinite(num)) return null;
+  return field.type === "int" ? Math.trunc(num) : num;
+}
+
+function inputHtml(field, value) {
+  const numeric = field.type !== "text";
+  const attrs = [
+    `type="${numeric ? "number" : "text"}"`,
+    `data-field="${field.key}"`,
+    `value="${escapeHtml(value)}"`,
+    `data-original="${escapeHtml(value)}"`,
+    numeric ? `step="${field.type === "int" ? "1" : "any"}"` : "",
+    field.type === "int" ? 'min="0"' : "",
+    'autocomplete="off"',
+  ].filter(Boolean).join(" ");
+  return `<label class="field${field.wide ? " wide" : ""}"><span>${escapeHtml(field.label)}</span><input ${attrs}></label>`;
+}
+
+async function loadDevices() {
+  devices = await api("/api/devices");
+}
+
+async function openDeviceDialog(name) {
+  try {
+    await loadDevices();
+  } catch (error) {
+    if (error.message === "unauthorized") return;
+    toast(error.message);
+  }
+  const device = devices.find((entry) => entry.name === name);
+  if (!device) {
+    toast("Unknown device");
+    return;
+  }
+  editingDeviceName = device.name;
+  $("#device-dialog-title").textContent = deviceDisplayName(device.name);
+  $("#device-dialog-id").textContent = device.name;
+  $("#device-fields").innerHTML = DEVICE_FIELDS
+    .map((field) => {
+      const value = device[field.key];
+      return inputHtml(field, value === null || value === undefined ? "" : String(value));
+    })
+    .join("");
+  lastFocused = document.activeElement;
+  const wrap = $("#device-dialog");
+  wrap.classList.remove("hidden");
+  wrap.setAttribute("aria-hidden", "false");
+  const first = wrap.querySelector("input");
+  if (first) first.focus();
+}
+
+function closeDeviceDialog() {
+  const wrap = $("#device-dialog");
+  wrap.classList.add("hidden");
+  wrap.setAttribute("aria-hidden", "true");
+  const name = editingDeviceName;
+  editingDeviceName = null;
+  if (lastFocused && document.contains(lastFocused)) {
+    lastFocused.focus();
+  } else if (name) {
+    const gear = document.querySelector(`[data-action="edit-device"][data-device="${CSS.escape(name)}"]`);
+    if (gear) gear.focus();
+  }
+}
+
+async function saveDevice() {
+  const name = editingDeviceName;
+  const device = devices.find((entry) => entry.name === name);
+  if (!device) return;
+  const body = {};
+  for (const field of DEVICE_FIELDS) {
+    const input = $(`#device-fields [data-field="${field.key}"]`);
+    const raw = input.value.trim();
+    if (!raw) continue;
+    const value = parseFieldValue(field, raw);
+    if (value === null) {
+      toast(`${field.label}: invalid number`);
+      input.focus();
+      return;
+    }
+    if (device[field.key] === value) continue;
+    body[field.key] = value;
+  }
+  if (!Object.keys(body).length) {
+    toast("No changes");
+    return;
+  }
+  const save = $("#device-save");
+  save.disabled = true;
+  try {
+    const updated = await api(`/api/devices/${encodeURIComponent(name)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    devices = devices.map((entry) => (entry.name === name ? updated : entry));
+    closeDeviceDialog();
+    toast("Saved to config.yaml");
+  } catch (error) {
+    if (error.message !== "unauthorized") toast(error.message);
+  } finally {
+    save.disabled = false;
+  }
+}
+
+function hideDialogs() {
+  for (const wrap of [$("#entity-dialog"), $("#device-dialog")]) {
+    wrap.classList.add("hidden");
+    wrap.setAttribute("aria-hidden", "true");
+  }
+  editingEntityId = null;
+  editingDeviceName = null;
+}
+
+function openEntityDialog(entityId) {
+  const entity = entities.get(entityId);
+  if (!entity) return;
+  const fields = ENTITY_FIELDS[entity.domain];
+  if (!fields) {
+    toast(`Editing ${entity.domain} entities is not supported`);
+    return;
+  }
+  editingEntityId = entityId;
+  $("#entity-dialog-title").textContent = `Edit ${entity.name}`;
+  $("#entity-dialog-id").textContent = entity.entity_id;
+  $("#entity-fields").innerHTML = fields.map((field) => inputHtml(field, fieldValue(entity, field))).join("");
+  lastFocused = document.activeElement;
+  const wrap = $("#entity-dialog");
+  wrap.classList.remove("hidden");
+  wrap.setAttribute("aria-hidden", "false");
+  const first = wrap.querySelector("input");
+  if (first) first.focus();
+}
+
+function closeEntityDialog() {
+  const wrap = $("#entity-dialog");
+  wrap.classList.add("hidden");
+  wrap.setAttribute("aria-hidden", "true");
+  const id = editingEntityId;
+  editingEntityId = null;
+  if (lastFocused && document.contains(lastFocused)) {
+    lastFocused.focus();
+  } else if (id) {
+    const gear = document.querySelector(`[data-entity-id="${CSS.escape(id)}"] [data-action="edit-entity"]`);
+    if (gear) gear.focus();
+  }
+}
+
+async function saveEntity() {
+  const entity = entities.get(editingEntityId);
+  if (!entity) return;
+  const fields = ENTITY_FIELDS[entity.domain];
+  const body = {};
+  for (const field of fields) {
+    const input = $(`#entity-fields [data-field="${field.key}"]`);
+    const raw = input.value.trim();
+    const original = input.dataset.original || "";
+    if (!raw) {
+      if (field.nullable && original) body[field.key] = null;
+      continue;
+    }
+    if (raw === original) continue;
+    const value = parseFieldValue(field, raw);
+    if (value === null) {
+      toast(`${field.label}: invalid number`);
+      input.focus();
+      return;
+    }
+    body[field.key] = value;
+  }
+  if (!Object.keys(body).length) {
+    closeEntityDialog();
+    toast("No changes");
+    return;
+  }
+  const save = $("#entity-save");
+  save.disabled = true;
+  try {
+    const updated = await api(`/api/entities/${encodeURIComponent(entity.entity_id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    updateEntity(updated);
+    closeEntityDialog();
+    toast("Saved to config.yaml");
+  } catch (error) {
+    if (error.message !== "unauthorized") toast(error.message);
+  } finally {
+    save.disabled = false;
+  }
+}
+
+$("#entity-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  saveEntity();
+});
+
+$("#device-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  saveDevice();
+});
+
+document.addEventListener("click", (event) => {
+  const edit = event.target.closest('[data-action="edit-entity"]');
+  if (edit) {
+    const card = edit.closest("[data-entity-id]");
+    if (card) openEntityDialog(card.dataset.entityId);
+    return;
+  }
+  const editDevice = event.target.closest('[data-action="edit-device"]');
+  if (editDevice) {
+    openDeviceDialog(editDevice.dataset.device);
+    return;
+  }
+  if (event.target.closest('[data-action="close-device"]') || event.target === $("#device-dialog")) {
+    closeDeviceDialog();
+    return;
+  }
+  if (event.target.closest('[data-action="close-entity"]') || event.target === $("#entity-dialog")) {
+    closeEntityDialog();
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  const entityOpen = !$("#entity-dialog").classList.contains("hidden");
+  const deviceOpen = !$("#device-dialog").classList.contains("hidden");
+  if (event.key === "Escape") {
+    if (entityOpen) closeEntityDialog();
+    else if (deviceOpen) closeDeviceDialog();
+    return;
+  }
+  if (event.key !== "Tab") return;
+  const container = entityOpen ? $("#entity-dialog") : deviceOpen ? $("#device-dialog") : null;
+  if (!container) return;
+  const focusables = [...container.querySelectorAll("button, input, select, textarea, [href], [tabindex]:not([tabindex=\"-1\"])")]
+    .filter((element) => !element.disabled);
+  if (!focusables.length) return;
+  const first = focusables[0];
+  const last = focusables[focusables.length - 1];
+  if (!container.contains(document.activeElement)) {
+    event.preventDefault();
+    first.focus();
+  } else if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
   }
 });
 

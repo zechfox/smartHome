@@ -75,3 +75,32 @@ async def test_unsubscribe():
     store.unsubscribe(queue)
     await store.set_state("sensor.a", 1)
     assert queue.empty()
+
+
+async def test_update_entity_meta_replaces_attributes():
+    store = StateStore()
+    entity = Entity(
+        entity_id="sensor.a",
+        name="A",
+        domain="sensor",
+        attributes={"device": "d", "unit_of_measurement": "H"},
+    )
+    store.add(entity)
+    entity.available = False
+    queue = store.subscribe()
+
+    updated = await store.update_entity_meta(
+        "sensor.a", name="B", attributes={"device": "d", "address": 1}
+    )
+
+    assert updated is entity
+    assert updated.name == "B"
+    assert updated.attributes == {"device": "d", "address": 1}
+    assert "unit_of_measurement" not in updated.attributes
+    assert updated.available is False
+    assert updated.state is None
+
+    payload = await asyncio.wait_for(queue.get(), timeout=1)
+    assert payload["type"] == "state_changed"
+    assert payload["entity"]["attributes"] == {"device": "d", "address": 1}
+    assert payload["entity"]["available"] is False

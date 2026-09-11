@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, Field, ValidationError, model_validator
+from pydantic import BaseModel, Field, PrivateAttr, ValidationError, model_validator
 
 DEFAULT_CONFIG_PATH = Path("config.yaml")
 ENV_CONFIG_PATH = "SMART_HOME_CONFIG"
@@ -89,6 +89,8 @@ class AppConfig(BaseModel):
     server: ServerConfig = Field(default_factory=ServerConfig)
     modbus: list[ModbusDeviceConfig] = Field(default_factory=list)
 
+    _source_path: Path | None = PrivateAttr(default=None)
+
     @model_validator(mode="after")
     def _validate_unique_ids(self) -> AppConfig:
         device_names = [device.name for device in self.modbus]
@@ -135,4 +137,58 @@ def load_config(path: str | Path | None = None) -> AppConfig:
             "server.api_token must not be empty (or set the SMART_HOME_TOKEN environment variable)"
         )
     config.server.api_token = token
+    config._source_path = resolved
     return config
+
+
+def validated_update(
+    model: BaseModel, updates: dict[str, Any], *, allowed: set[str]
+) -> None:
+    """Validate an update against ``model`` and apply it in place.
+
+    Mutates the same object (rather than replacing it) so any shared references
+    held by pollers/devices remain valid. Unknown keys raise ``ValueError``.
+    """
+    unknown = set(updates) - allowed
+    if unknown:
+        raise ValueError(f"unknown field(s): {', '.join(sorted(unknown))}")
+
+    merged = model.model_dump() | updates
+    validated = type(model).model_validate(merged)
+    for key in updates:
+        setattr(model, key, getattr(validated, key))
+
+
+def save_config(config: AppConfig) -> None:
+    """Persist only the ``modbus`` section back to the source YAML file.
+
+    Everything above the top-level ``modbus:`` line (header comments and the
+    ``server`` section) is preserved byte-for-byte; only the ``modbus`` list is
+    re-serialized. The write is atomic (temp file + ``os.replace``).
+    """
+    path = config._source_path
+    if path is None:
+        raise RuntimeError("config source path is not set")
+
+    text = path.read_text(encoding="utf-8")
+    lines = text.splitlines()
+    for idx, line in enumerate(lines):
+        if line.strip().startswith("modbus:"):
+            break
+    else:
+        raise RuntimeError("modbus: section not found in config file")
+    prefix = "\n".join(lines[:idx]) + "\n"
+
+    modbus_data = [
+        device.model_dump(mode="json", exclude_none=True, by_alias=True)
+        for device in config.modbus
+    ]
+    body = yaml.safe_dump(modbus_data, sort_keys=False, default_flow_style=False)
+    indented = "\n".join(
+        ("  " + line) if line.strip() else "" for line in body.splitlines()
+    )
+    new_text = prefix + "modbus:\n" + indented + "\n"
+
+    tmp_path = path.with_name(f"{path.name}.tmp")
+    tmp_path.write_text(new_text, encoding="utf-8")
+    os.replace(tmp_path, path)

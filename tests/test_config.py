@@ -4,7 +4,15 @@ from __future__ import annotations
 
 import pytest
 
-from app.config import AppConfig, ConfigError, SensorConfig, load_config
+from app.config import (
+    AppConfig,
+    ConfigError,
+    ModbusDeviceConfig,
+    SensorConfig,
+    load_config,
+    save_config,
+    validated_update,
+)
 
 VALID = """
 server:
@@ -100,3 +108,49 @@ def test_struct_alias_and_register_count():
     assert sensor.register_count == 3
     assert SensorConfig(id="y", address=1, data_type="int32").register_count == 2
     assert SensorConfig(id="z", address=1).register_count == 1
+
+
+def test_validated_update_rejects_unknown_keys():
+    device = ModbusDeviceConfig(name="dev", host="10.0.0.1")
+    with pytest.raises(ValueError, match="unknown field"):
+        validated_update(device, {"bogus": 1}, allowed={"host"})
+
+
+def test_validated_update_mutates_in_place():
+    device = ModbusDeviceConfig(name="dev", host="10.0.0.1")
+    validated_update(device, {"host": "10.0.0.2"}, allowed={"host"})
+    assert device.host == "10.0.0.2"
+
+
+def test_validated_update_coerces_and_validates():
+    device = ModbusDeviceConfig(name="dev", host="10.0.0.1")
+    validated_update(device, {"port": "8899"}, allowed={"port"})
+    assert device.port == 8899
+    with pytest.raises(ValueError):
+        validated_update(device, {"port": 0}, allowed={"port"})
+
+
+def test_save_config_rewrites_modbus_and_preserves_prefix(tmp_path):
+    path = tmp_path / "config.yaml"
+    path.write_text(
+        "# header\n"
+        "server:\n"
+        "  api_token: secret\n"
+        "\n"
+        "modbus:\n"
+        "  - name: dev\n"
+        "    host: 10.0.0.1\n",
+        encoding="utf-8",
+    )
+    config = load_config(path)
+    config.modbus[0].host = "10.0.0.99"
+    save_config(config)
+
+    text = path.read_text(encoding="utf-8")
+    assert "# header" in text
+    assert "server:" in text
+    assert "api_token: secret" in text
+    assert "10.0.0.99" in text
+
+    reloaded = load_config(path)
+    assert reloaded.modbus[0].host == "10.0.0.99"

@@ -18,6 +18,10 @@ class ModbusSwitch:
         self.config = config
         self.store = store
         self.entity_id = f"switch.{config.id}"
+        self._wake = asyncio.Event()
+
+    def notify_change(self) -> None:
+        self._wake.set()
 
     async def turn_on(self) -> None:
         await self._write(True)
@@ -27,7 +31,14 @@ class ModbusSwitch:
 
     async def run(self) -> None:
         while True:
-            await asyncio.sleep(self.config.scan_interval or 30.0)
+            try:
+                await asyncio.wait_for(
+                    self._wake.wait(), timeout=self.config.scan_interval or 30.0
+                )
+            except asyncio.TimeoutError:
+                pass
+            finally:
+                self._wake.clear()
             await self.refresh()
 
     async def refresh(self) -> None:

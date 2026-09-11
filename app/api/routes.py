@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from app.auth import make_token_dependency
 from app.modbus.client import ModbusError
@@ -43,6 +43,46 @@ def create_api_router(system: SmartHomeSystem, token: str) -> APIRouter:
                 status_code=status.HTTP_404_NOT_FOUND, detail=f"unknown entity: {entity_id}"
             )
         return entity.to_dict()
+
+    @router.get("/devices", dependencies=[Depends(require_token)])
+    async def list_devices() -> list[dict[str, Any]]:
+        return system.list_devices()
+
+    @router.patch("/devices/{device_name}", dependencies=[Depends(require_token)])
+    async def patch_device(device_name: str, body: dict[str, Any]) -> dict[str, Any]:
+        if not body:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="empty body"
+            )
+        try:
+            return await system.update_device(device_name, body)
+        except KeyError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"unknown device: {device_name}",
+            ) from exc
+        except (ValueError, ValidationError) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+            ) from exc
+
+    @router.patch("/entities/{entity_id}", dependencies=[Depends(require_token)])
+    async def patch_entity(entity_id: str, body: dict[str, Any]) -> dict[str, Any]:
+        if not body:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="empty body"
+            )
+        try:
+            return (await system.update_entity(entity_id, body)).to_dict()
+        except KeyError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"unknown entity: {entity_id}",
+            ) from exc
+        except (ValueError, ValidationError) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+            ) from exc
 
     @router.post("/entities/{entity_id}/set", dependencies=[Depends(require_token)])
     async def set_entity(entity_id: str, body: SetStateRequest) -> dict:

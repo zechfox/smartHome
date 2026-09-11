@@ -89,6 +89,23 @@ class StateStore:
         self._notify(entity)
         return entity
 
+    async def update_entity_meta(
+        self,
+        entity_id: str,
+        *,
+        name: str | None = None,
+        attributes: dict[str, Any] | None = None,
+    ) -> Entity:
+        async with self._lock:
+            entity = self._entities[entity_id]
+            if name is not None:
+                entity.name = name
+            if attributes is not None:
+                entity.attributes = attributes
+            entity.last_updated = _now()
+        self._notify(entity)
+        return entity
+
     def subscribe(self) -> asyncio.Queue[dict[str, Any]]:
         queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=100)
         self._subscribers.add(queue)

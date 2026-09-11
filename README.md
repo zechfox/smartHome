@@ -10,6 +10,7 @@ handful of devices (door lockers + a Panasonic heat exchanger).
 - Modbus sensors polled on per-sensor intervals (int16/uint16/int32/uint32/float32/custom struct)
 - REST API protected by a bearer token
 - Web dashboard with live WebSocket updates and polling fallback
+- Runtime editing of device/entity settings from the dashboard, persisted back to `config.yaml`
 - Runs in a single process; no database, no add-ons
 
 ## Quick start
@@ -79,6 +80,9 @@ All endpoints except `/api/health` require `Authorization: Bearer <api_token>`.
 | GET | `/api/entities?domain=switch` | List entities (optional domain filter) |
 | GET | `/api/entities/{entity_id}` | Get one entity |
 | POST | `/api/entities/{entity_id}/set` | Switch: `{"state": "on"}` or `{"state": "off"}` |
+| GET | `/api/devices` | List devices with editable connection settings |
+| PATCH | `/api/devices/{device_name}` | Update device settings (host/port/slave/timeout/reconnect_interval) |
+| PATCH | `/api/entities/{entity_id}` | Update entity settings (address/scan_interval/scale/name/...) |
 | WS | `/ws?token=<api_token>` | Live state stream (snapshot + `state_changed` events) |
 
 Example:

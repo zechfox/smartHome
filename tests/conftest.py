@@ -27,6 +27,8 @@ class FakeModbusDevice:
         self.coils: dict[int, bool] = {}
         self.writes: list[tuple[str, int, int]] = []
         self.fail = False
+        self.reconfigured = False
+        self.reconfigures: list[bool] = []
 
     @property
     def name(self) -> str:
@@ -61,10 +63,14 @@ class FakeModbusDevice:
     async def close(self) -> None:
         pass
 
+    async def reconfigure(self, rebuild: bool) -> None:
+        self.reconfigured = True
+        self.reconfigures.append(rebuild)
+
 
 @pytest.fixture
-def config() -> AppConfig:
-    return AppConfig(
+def config(tmp_path) -> AppConfig:
+    cfg = AppConfig(
         server=ServerConfig(api_token=TOKEN),
         modbus=[
             ModbusDeviceConfig(
@@ -103,6 +109,11 @@ def config() -> AppConfig:
             )
         ],
     )
+    cfg._source_path = tmp_path / "config.yaml"
+    cfg._source_path.write_text(
+        "server:\n  api_token: test-token\nmodbus: []\n", encoding="utf-8"
+    )
+    return cfg
 
 
 @pytest.fixture

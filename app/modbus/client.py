@@ -111,6 +111,15 @@ class ModbusDevice:
     async def close(self) -> None:
         await self._disconnect()
 
+    async def reconfigure(self, rebuild: bool) -> None:
+        async with self._lock:
+            if rebuild:
+                await self._disconnect()
+                self._client = AsyncModbusTcpClient(
+                    self.config.host, port=self.config.port, timeout=self.config.timeout
+                )
+                self._next_connect_at = 0.0
+
     async def _ensure_connected(self) -> None:
         if self._client.connected:
             return

@@ -15,6 +15,8 @@ handful of devices (door lockers + a Panasonic heat exchanger).
 
 ## Quick start
 
+Requires Python 3.9 or newer.
+
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
@@ -113,6 +115,28 @@ journalctl -u smart-home -f
 
 Adjust `User=`/`Group=` and paths in the unit file if you do not deploy as `pi`
 and `/opt/smart-home`.
+
+### One-shot install (dedicated user + systemd user service)
+
+Build a release tarball (on the development machine):
+
+```bash
+./deploy/package.sh          # -> dist/smartHome-<version>.tar.gz (+ .sha256)
+```
+
+Copy it to the target, extract it, then install:
+
+```bash
+tar -xzf smartHome-<version>.tar.gz
+cd smartHome-<version>
+sudo ./deploy/install.sh
+```
+
+Creates a dedicated `smartHome` user, installs the app and a virtualenv into
+`/home/smartHome/.smartHome`, installs a systemd *user* unit
+(`deploy/smart-home.user.service`) and enables lingering so it starts at boot.
+Re-running the script upgrades the code and dependencies while keeping
+`config.yaml`.
 
 ## Security
 

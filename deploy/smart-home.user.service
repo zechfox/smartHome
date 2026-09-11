@@ -1,0 +1,16 @@
+[Unit]
+Description=smartHome - lightweight home automation controller
+Documentation=file://%h/.smartHome/README.md
+
+[Service]
+Type=simple
+WorkingDirectory=%h/.smartHome
+Environment=SMART_HOME_CONFIG=%h/.smartHome/config.yaml
+ExecStart=%h/.smartHome/.venv/bin/python -m app
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target

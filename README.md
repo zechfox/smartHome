@@ -54,6 +54,7 @@ modbus:
         command_off: 0      # value written for off (default 0)
         verify_delay: 1     # seconds to wait before reading state back (0 = no verify)
         scan_interval: 30   # optional periodic state refresh in seconds
+        pulse_duration: 10  # optional: switch off again this many seconds after 'on'
     sensors:
       - id: exchanger_warning_value
         name: Exchanger Warning Value
@@ -72,6 +73,10 @@ modbus:
 
 Entity IDs are exposed as `switch.<id>` and `sensor.<id>`.
 
+A switch with `pulse_duration` set switches off automatically that many seconds
+after it is turned on (from the dashboard or the API). The `duration` field in a
+`set` request overrides the configured value for that call.
+
 ## API
 
 All endpoints except `/api/health` require `Authorization: Bearer <api_token>`.
@@ -81,7 +86,7 @@ All endpoints except `/api/health` require `Authorization: Bearer <api_token>`.
 | GET | `/api/health` | Service and device connection status |
 | GET | `/api/entities?domain=switch` | List entities (optional domain filter) |
 | GET | `/api/entities/{entity_id}` | Get one entity |
-| POST | `/api/entities/{entity_id}/set` | Switch: `{"state": "on"}` or `{"state": "off"}` |
+| POST | `/api/entities/{entity_id}/set` | Switch: `{"state": "on"}` or `{"state": "off"}`; `{"state": "on", "duration": 5}` auto-off after 5s |
 | GET | `/api/devices` | List devices with editable connection settings |
 | PATCH | `/api/devices/{device_name}` | Update device settings (host/port/slave/timeout/reconnect_interval) |
 | PATCH | `/api/entities/{entity_id}` | Update entity settings (address/scan_interval/scale/name/...) |
@@ -93,7 +98,51 @@ Example:
 curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/entities
 curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
      -d '{"state":"on"}' http://localhost:8080/api/entities/switch.exchanger_state/set
+
+# pulse: on, then off again after the configured pulse_duration
+curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+     -d '{"state":"on"}' \
+     http://localhost:8080/api/entities/switch.unit_door_locker2/set
+
+# pulse with an explicit duration in seconds (overrides pulse_duration)
+curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+     -d '{"state":"on","duration":5}' \
+     http://localhost:8080/api/entities/switch.unit_door_locker2/set
 ```
+
+## iOS Shortcuts
+
+iOS Shortcuts can flip a switch from the Home Screen, Siri or an automation.
+Create one shortcut per action:
+
+1. Open the **Shortcuts** app, tap **+**, and add a **Get Contents of URL**
+   action.
+2. Set the URL to the entity's `set` endpoint, e.g.
+   `http://<target>:8080/api/entities/switch.unit_door_locker2/set`.
+3. Expand **Show More** and set:
+   - **Method**: `POST`
+   - **Headers**: `Authorization` = `Bearer <api_token>` and
+     `Content-Type` = `application/json`
+   - **Request Body**: `JSON` with a `state` field set to `on` (or `off`)
+4. Name the shortcut (e.g. "Unlock Unit Door 2") and tap **Done**.
+5. Optional: add a **Show Notification** action using the request result.
+6. Add it to the Home Screen from the share sheet, or run it via Siri by
+   name.
+
+To control both states from one shortcut, add a **Choose from Menu** action
+with On/Off entries and use the chosen value in the `state` field.
+
+Notes:
+
+- To use a timed on, add a `duration` (Number) field next to `state` in the
+  JSON body.
+- The token is `server.api_token` in `config.yaml`; iOS asks for Local
+  Network permission the first time a shortcut calls the service.
+- A switch with `verify_delay` (e.g. `unit_door_locker2` waits 10s) only
+  returns after reading the state back, so the shortcut waits accordingly.
+- If the service is behind a reverse proxy with TLS, use the `https://` URL.
+- Shortcuts store the token in the shortcut itself; keep it off shared
+  devices or lock it down as you would the dashboard token.
 
 ## Deploy on Raspberry Pi (systemd)
 

@@ -60,6 +60,23 @@
     cursor: pointer;
   }
   #logout:hover { color: var(--text); border-color: var(--muted); }
+  .view-toggle {
+    display: inline-flex;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .view-toggle button {
+    background: none;
+    border: none;
+    color: var(--muted);
+    padding: 6px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .view-toggle button + button { border-left: 1px solid var(--border); }
+  .view-toggle button.active { background: var(--surface-hover); color: var(--text); }
   main { padding: 22px; max-width: 1200px; margin: 0 auto; }
   section { margin-bottom: 30px; }
   h2 {
@@ -196,19 +213,16 @@
 <header>
   <h1>smartHome</h1>
   <div class="spacer"></div>
+  <div id="view-toggle" class="view-toggle" role="group" aria-label="View">
+    <button type="button" data-view="device">By Device</button>
+    <button type="button" data-view="type">By Type</button>
+  </div>
   <span id="connection"><span class="dot"></span><span id="connection-label">connecting</span></span>
   <button id="logout" type="button">Lock</button>
 </header>
 
 <main>
-  <section>
-    <h2>Switches <span id="switch-count" class="count"></span></h2>
-    <div id="switches" class="grid"></div>
-  </section>
-  <section>
-    <h2>Sensors <span id="sensor-count" class="count"></span></h2>
-    <div id="sensors" class="grid"></div>
-  </section>
+  <div id="groups"></div>
 </main>
 
 <div id="login" class="hidden">
@@ -227,10 +241,12 @@
 "use strict";
 
 const TOKEN_KEY = "smart-home-token";
+const VIEW_KEY = "smart-home-view";
 const POLL_INTERVAL = 5000;
 const MAX_WS_DELAY = 30000;
 
 let token = localStorage.getItem(TOKEN_KEY) || "";
+let viewMode = localStorage.getItem(VIEW_KEY) || "device";
 let entities = new Map();
 let socket = null;
 let pollTimer = null;
@@ -298,22 +314,58 @@ function sensorCard(entity) {
     </article>`;
 }
 
-function renderGroup(domain, container, renderer, emptyText) {
-  const list = [...entities.values()]
-    .filter((entity) => entity.domain === domain)
-    .sort((a, b) => a.name.localeCompare(b.name));
-  if (!list.length) {
-    container.innerHTML = `<p class="empty">${emptyText}</p>`;
-    return;
+function deviceDisplayName(device) {
+  if (!device) return "Other";
+  return device
+    .split("_")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+function groupEntities() {
+  const groups = new Map();
+  for (const entity of entities.values()) {
+    const key = viewMode === "device" ? (entity.attributes.device || "Other") : entity.domain;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(entity);
   }
-  container.innerHTML = list.map(renderer).join("");
+  return groups;
+}
+
+function sectionTitle(key) {
+  if (viewMode === "type") return key === "switch" ? "Switches" : "Sensors";
+  return deviceDisplayName(key);
+}
+
+function sortGroup(list) {
+  return list.slice().sort((a, b) => {
+    if (a.domain !== b.domain) return a.domain === "switch" ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+function cardFor(entity) {
+  return entity.domain === "switch" ? switchCard(entity) : sensorCard(entity);
 }
 
 function render() {
-  renderGroup("switch", $("#switches"), switchCard, "No switches configured.");
-  renderGroup("sensor", $("#sensors"), sensorCard, "No sensors configured.");
-  $("#switch-count").textContent = [...entities.values()].filter((e) => e.domain === "switch").length;
-  $("#sensor-count").textContent = [...entities.values()].filter((e) => e.domain === "sensor").length;
+  const container = $("#groups");
+  const groups = groupEntities();
+  if (!groups.size) {
+    container.innerHTML = `<p class="empty">No devices configured.</p>`;
+    return;
+  }
+  container.innerHTML = [...groups.entries()]
+    .map(([key, list]) => {
+      const sorted = sortGroup(list);
+      return `
+    <section>
+      <h2>${escapeHtml(sectionTitle(key))} <span class="count">${sorted.length}</span></h2>
+      <div class="grid">${sorted.map(cardFor).join("")}</div>
+    </section>`;
+    })
+    .join("");
 }
 
 function updateEntity(entity) {
@@ -324,7 +376,7 @@ function updateEntity(entity) {
     render();
     return;
   }
-  card.outerHTML = entity.domain === "switch" ? switchCard(entity) : sensorCard(entity);
+  card.outerHTML = cardFor(entity);
 }
 
 function setConnection(live, label) {
@@ -471,6 +523,21 @@ $("#login-form").addEventListener("submit", (event) => {
 });
 
 $("#logout").addEventListener("click", () => lock(""));
+
+$("#view-toggle").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-view]");
+  if (!button) return;
+  viewMode = button.dataset.view;
+  localStorage.setItem(VIEW_KEY, viewMode);
+  document.querySelectorAll("#view-toggle button").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.view === viewMode);
+  });
+  render();
+});
+
+document.querySelectorAll("#view-toggle button").forEach((btn) => {
+  btn.classList.toggle("active", btn.dataset.view === viewMode);
+});
 
 setInterval(() => { if (!document.hidden) render(); }, 30000);
 

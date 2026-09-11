@@ -17,6 +17,8 @@ SERVICE_NAME="smart-home"
 SERVICE_USER="smartHome"
 INSTALL_DIRNAME=".smartHome"
 DEFAULT_HOME="/home/${SERVICE_USER}"
+BIN_DIR="${SMART_HOME_BIN_DIR:-/usr/local/bin}"
+WRAPPER="${BIN_DIR}/${SERVICE_NAME}-ctl"
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
@@ -122,6 +124,14 @@ install -d -m 0755 -o "${SERVICE_USER}" -g "${SERVICE_GROUP}" "${UNIT_DIR}"
 install -m 0644 -o "${SERVICE_USER}" -g "${SERVICE_GROUP}" \
     "${UNIT_SOURCE}" "${UNIT_DIR}/${SERVICE_NAME}.service"
 
+log "installing control wrapper ${WRAPPER}"
+install -d -m 0755 "${BIN_DIR}"
+cat > "${WRAPPER}" <<EOF
+#!/bin/sh
+exec sudo -u ${SERVICE_USER} env XDG_RUNTIME_DIR="/run/user/\$(id -u ${SERVICE_USER})" systemctl --user "\$@"
+EOF
+chmod 0755 "${WRAPPER}"
+
 log "enabling linger for '${SERVICE_USER}' (start at boot without login)"
 loginctl enable-linger "${SERVICE_USER}"
 
@@ -162,11 +172,11 @@ smartHome is installed.
   install dir  : ${INSTALL_DIR}
   config file  : ${INSTALL_DIR}/config.yaml
   unit file    : ${UNIT_DIR}/${SERVICE_NAME}.service
+  wrapper      : ${WRAPPER}
 
-Manage the service as the service user:
+Manage the service:
 
-  sudo -u ${SERVICE_USER} env XDG_RUNTIME_DIR=${runtime_dir} \\
-      systemctl --user {status|restart|stop} ${SERVICE_NAME}
+  ${SERVICE_NAME}-ctl {status|restart|stop} ${SERVICE_NAME}
 
 Follow the logs:
 

@@ -134,9 +134,9 @@ sudo ./deploy/install.sh
 
 Creates a dedicated `smartHome` user, installs the app and a virtualenv into
 `/home/smartHome/.smartHome`, installs a systemd *user* unit
-(`deploy/smart-home.user.service`) and enables lingering so it starts at boot.
-Re-running the script upgrades the code and dependencies while keeping
-`config.yaml`.
+(`deploy/smart-home.user.service`), a `smart-home-ctl` control wrapper in
+`/usr/local/bin` and enables lingering so it starts at boot. Re-running the
+script upgrades the code and dependencies while keeping `config.yaml`.
 
 ## Operations
 
@@ -153,22 +153,13 @@ sudo -u smartHome env XDG_RUNTIME_DIR=/run/user/$(id -u smartHome) systemctl --u
 sudo -u smartHome env XDG_RUNTIME_DIR=/run/user/$(id -u smartHome) systemctl --user stop smart-home
 ```
 
-Optional convenience wrapper:
-
-```bash
-sudo tee /usr/local/bin/smart-home-ctl >/dev/null <<'EOF'
-#!/bin/sh
-exec sudo -u smartHome env XDG_RUNTIME_DIR="/run/user/$(id -u smartHome)" \
-    systemctl --user "$@"
-EOF
-sudo chmod +x /usr/local/bin/smart-home-ctl
-```
-
-Then use it without the long prefix:
+The installer also drops a `smart-home-ctl` wrapper in `/usr/local/bin`, so
+the common commands are just:
 
 ```bash
 smart-home-ctl status smart-home
 smart-home-ctl restart smart-home
+smart-home-ctl stop smart-home
 ```
 
 Follow the logs (user-unit messages are in the system journal under the
@@ -212,6 +203,7 @@ dependencies, keeps `config.yaml`, and restarts the service.
 ```bash
 smart-home-ctl disable --now smart-home
 sudo loginctl disable-linger smartHome
+sudo rm -f /usr/local/bin/smart-home-ctl
 sudo userdel -r smartHome
 ```
 

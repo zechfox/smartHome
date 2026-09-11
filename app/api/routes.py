@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ValidationError
@@ -29,7 +29,7 @@ def create_api_router(system: SmartHomeSystem, token: str) -> APIRouter:
         }
 
     @router.get("/entities", dependencies=[Depends(require_token)])
-    async def list_entities(domain: str | None = None) -> list[dict]:
+    async def list_entities(domain: Optional[str] = None) -> list[dict]:
         entities = system.store.all()
         if domain is not None:
             entities = [entity for entity in entities if entity.domain == domain]

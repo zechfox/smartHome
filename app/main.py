@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Optional
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
@@ -21,8 +22,8 @@ WEB_DIR = Path(__file__).parent / "web"
 
 
 def create_app(
-    config: AppConfig | None = None,
-    device_factory: DeviceFactory | None = None,
+    config: Optional[AppConfig] = None,
+    device_factory: Optional[DeviceFactory] = None,
 ) -> FastAPI:
     config = config or load_config()
     system = SmartHomeSystem(config, device_factory=device_factory)

@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 
 import pytest
-from conftest import TOKEN, FakeModbusDevice
+from conftest import TOKEN, FakeModbusDevice, make_app
 from fastapi.testclient import TestClient
 
 from app.main import create_app
@@ -168,6 +168,14 @@ def test_websocket_rejects_bad_token(client):
     with pytest.raises(Exception):
         with client.websocket_connect("/ws?token=nope"):
             pass
+
+
+def test_loop_bound_primitives_are_created_lazily(config, devices):
+    """Python 3.9 binds asyncio primitives to the loop that creates them."""
+    app = make_app(config, devices)
+    system = app.state.system
+    assert system._shutdown_event is None
+    assert system.store._lock is None
 
 
 def test_websocket_handler_cleans_up_on_disconnect(client):

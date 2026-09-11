@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import struct
+from typing import Union
 
 from app.config import SensorConfig
 
@@ -19,7 +20,9 @@ def registers_to_bytes(registers: list[int]) -> bytes:
     return b"".join((register & 0xFFFF).to_bytes(2, "big") for register in registers)
 
 
-def decode_value(sensor: SensorConfig, registers: list[int]) -> int | float | list[int | float]:
+def decode_value(
+    sensor: SensorConfig, registers: list[int]
+) -> Union[int, float, list[Union[int, float]]]:
     """Decode raw registers according to the sensor's data type."""
     raw = registers_to_bytes(registers)
     fmt = sensor.struct_format if sensor.data_type == "custom" else _FORMATS[sensor.data_type]
@@ -32,7 +35,7 @@ def decode_value(sensor: SensorConfig, registers: list[int]) -> int | float | li
     return values[0]
 
 
-def apply_scale(sensor: SensorConfig, value: int | float | list[int | float]):
+def apply_scale(sensor: SensorConfig, value: Union[int, float, list[Union[int, float]]]):
     """Apply scale and precision; custom multi-value results pass through."""
     if isinstance(value, list):
         return value

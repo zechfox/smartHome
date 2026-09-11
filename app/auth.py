@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import secrets
 from collections.abc import Awaitable, Callable
+from typing import Optional
 
 from fastapi import Header, HTTPException, status
 
 
 def make_token_dependency(token: str) -> Callable[..., Awaitable[None]]:
-    async def require_token(authorization: str | None = Header(default=None)) -> None:
+    async def require_token(authorization: Optional[str] = Header(default=None)) -> None:
         if not authorization or not authorization.lower().startswith("bearer "):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

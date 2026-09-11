@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Optional, Union
 
 import yaml
 from pydantic import BaseModel, Field, PrivateAttr, ValidationError, model_validator
@@ -27,13 +27,13 @@ class ServerConfig(BaseModel):
 
 class SwitchConfig(BaseModel):
     id: str
-    name: str | None = None
+    name: Optional[str] = None
     type: Literal["coil", "holding"] = "coil"
     address: int = Field(ge=0)
     command_on: int = 1
     command_off: int = 0
     verify_delay: float = Field(default=0.0, ge=0)
-    scan_interval: float | None = Field(default=None, gt=0)
+    scan_interval: Optional[float] = Field(default=None, gt=0)
 
     @property
     def display_name(self) -> str:
@@ -42,15 +42,15 @@ class SwitchConfig(BaseModel):
 
 class SensorConfig(BaseModel):
     id: str
-    name: str | None = None
+    name: Optional[str] = None
     address: int = Field(ge=0)
     data_type: Literal["int16", "uint16", "int32", "uint32", "float32", "custom"] = "int16"
-    count: int | None = Field(default=None, ge=1)
-    struct_format: str | None = Field(default=None, alias="struct")
-    unit: str | None = None
+    count: Optional[int] = Field(default=None, ge=1)
+    struct_format: Optional[str] = Field(default=None, alias="struct")
+    unit: Optional[str] = None
     scan_interval: float = Field(default=10.0, gt=0)
     scale: float = 1.0
-    precision: int | None = Field(default=None, ge=0)
+    precision: Optional[int] = Field(default=None, ge=0)
 
     model_config = {"populate_by_name": True}
 
@@ -89,7 +89,7 @@ class AppConfig(BaseModel):
     server: ServerConfig = Field(default_factory=ServerConfig)
     modbus: list[ModbusDeviceConfig] = Field(default_factory=list)
 
-    _source_path: Path | None = PrivateAttr(default=None)
+    _source_path: Optional[Path] = PrivateAttr(default=None)
 
     @model_validator(mode="after")
     def _validate_unique_ids(self) -> AppConfig:
@@ -106,7 +106,7 @@ class AppConfig(BaseModel):
         return self
 
 
-def load_config(path: str | Path | None = None) -> AppConfig:
+def load_config(path: Optional[Union[str, Path]] = None) -> AppConfig:
     """Load and validate the YAML configuration.
 
     Path resolution order: explicit ``path`` argument, ``SMART_HOME_CONFIG``

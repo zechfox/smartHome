@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Optional
 
 from app.config import (
     AppConfig,
@@ -61,7 +61,7 @@ class SmartHomeSystem:
     def __init__(
         self,
         config: AppConfig,
-        device_factory: DeviceFactory | None = None,
+        device_factory: Optional[DeviceFactory] = None,
     ) -> None:
         self.config = config
         self.store = StateStore()
@@ -70,7 +70,14 @@ class SmartHomeSystem:
         self.sensors: dict[str, SensorPoller] = {}
         self._device_factory = device_factory or ModbusDevice
         self._tasks: list[asyncio.Task[None]] = []
-        self.shutdown_event = asyncio.Event()
+        self._shutdown_event: Optional[asyncio.Event] = None
+
+    @property
+    def shutdown_event(self) -> asyncio.Event:
+        """Create the event lazily so it binds to the running loop (Python 3.9)."""
+        if self._shutdown_event is None:
+            self._shutdown_event = asyncio.Event()
+        return self._shutdown_event
 
     async def start(self) -> None:
         self._build_entities()

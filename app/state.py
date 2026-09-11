@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 Domain = Literal["switch", "sensor"]
 
@@ -22,8 +22,8 @@ class Entity:
     state: Any = None
     attributes: dict[str, Any] = field(default_factory=dict)
     available: bool = True
-    last_changed: datetime | None = None
-    last_updated: datetime | None = None
+    last_changed: Optional[datetime] = None
+    last_updated: Optional[datetime] = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -44,7 +44,14 @@ class StateStore:
     def __init__(self) -> None:
         self._entities: dict[str, Entity] = {}
         self._subscribers: set[asyncio.Queue[dict[str, Any]]] = set()
-        self._lock = asyncio.Lock()
+        self._lock: Optional[asyncio.Lock] = None
+
+    @property
+    def _state_lock(self) -> asyncio.Lock:
+        """Create the lock lazily so it binds to the running loop (Python 3.9)."""
+        if self._lock is None:
+            self._lock = asyncio.Lock()
+        return self._lock
 
     def add(self, entity: Entity) -> None:
         if entity.entity_id in self._entities:
@@ -52,7 +59,7 @@ class StateStore:
         entity.last_changed = entity.last_updated = _now()
         self._entities[entity.entity_id] = entity
 
-    def get(self, entity_id: str) -> Entity | None:
+    def get(self, entity_id: str) -> Optional[Entity]:
         return self._entities.get(entity_id)
 
     def all(self) -> list[Entity]:
@@ -63,10 +70,10 @@ class StateStore:
         entity_id: str,
         state: Any,
         *,
-        attributes: dict[str, Any] | None = None,
+        attributes: Optional[dict[str, Any]] = None,
         available: bool = True,
     ) -> Entity:
-        async with self._lock:
+        async with self._state_lock:
             entity = self._entities[entity_id]
             now = _now()
             if entity.state != state:
@@ -80,7 +87,7 @@ class StateStore:
         return entity
 
     async def set_availability(self, entity_id: str, available: bool) -> Entity:
-        async with self._lock:
+        async with self._state_lock:
             entity = self._entities[entity_id]
             if entity.available == available:
                 return entity
@@ -93,10 +100,10 @@ class StateStore:
         self,
         entity_id: str,
         *,
-        name: str | None = None,
-        attributes: dict[str, Any] | None = None,
+        name: Optional[str] = None,
+        attributes: Optional[dict[str, Any]] = None,
     ) -> Entity:
-        async with self._lock:
+        async with self._state_lock:
             entity = self._entities[entity_id]
             if name is not None:
                 entity.name = name

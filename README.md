@@ -138,6 +138,86 @@ Creates a dedicated `smartHome` user, installs the app and a virtualenv into
 Re-running the script upgrades the code and dependencies while keeping
 `config.yaml`.
 
+## Operations
+
+Open the dashboard at `http://<target>:8080` (or the configured
+`server.host`/`server.port`) and paste the `api_token` from `config.yaml`.
+
+The one-shot install runs smartHome as a systemd *user* service for the
+`smartHome` account. Since that account has no login shell, `systemctl --user`
+needs its runtime directory:
+
+```bash
+sudo -u smartHome env XDG_RUNTIME_DIR=/run/user/$(id -u smartHome) systemctl --user status smart-home
+sudo -u smartHome env XDG_RUNTIME_DIR=/run/user/$(id -u smartHome) systemctl --user restart smart-home
+sudo -u smartHome env XDG_RUNTIME_DIR=/run/user/$(id -u smartHome) systemctl --user stop smart-home
+```
+
+Optional convenience wrapper:
+
+```bash
+sudo tee /usr/local/bin/smart-home-ctl >/dev/null <<'EOF'
+#!/bin/sh
+exec sudo -u smartHome env XDG_RUNTIME_DIR="/run/user/$(id -u smartHome)" \
+    systemctl --user "$@"
+EOF
+sudo chmod +x /usr/local/bin/smart-home-ctl
+```
+
+Then use it without the long prefix:
+
+```bash
+smart-home-ctl status smart-home
+smart-home-ctl restart smart-home
+```
+
+Follow the logs (user-unit messages are in the system journal under the
+`smartHome` UID):
+
+```bash
+sudo journalctl _UID=$(id -u smartHome) -f
+```
+
+For the `/opt/smart-home` system service from the section above, use plain
+`sudo systemctl status smart-home` and `sudo journalctl -u smart-home -f`
+instead.
+
+### Edit the configuration
+
+The live configuration is `/home/smartHome/.smartHome/config.yaml`:
+
+```bash
+sudo nano /home/smartHome/.smartHome/config.yaml
+smart-home-ctl restart smart-home     # apply server.* changes
+```
+
+- `server.host`, `server.port`, `server.api_token` and
+  `server.shutdown_timeout` are read at startup, so restart after changing
+  them. After changing `api_token`, log in again with the new token.
+- `modbus` device and entity settings can also be edited live from the
+  dashboard; those updates take effect immediately and are written back to
+  `config.yaml`.
+- `SMART_HOME_CONFIG` overrides the config path and `SMART_HOME_TOKEN`
+  overrides the token, e.g. via
+  `smart-home-ctl edit smart-home` (adds an override drop-in).
+
+### Upgrade
+
+Build a new tarball with `./deploy/package.sh`, copy and extract it on the
+target, then run `sudo ./deploy/install.sh` again. It refreshes the code and
+dependencies, keeps `config.yaml`, and restarts the service.
+
+### Uninstall
+
+```bash
+smart-home-ctl disable --now smart-home
+sudo loginctl disable-linger smartHome
+sudo userdel -r smartHome
+```
+
+`userdel -r` deletes `/home/smartHome`, including `config.yaml`; back it up
+first if needed.
+
 ## Security
 
 - The API and dashboard can open door lockers: always set a strong

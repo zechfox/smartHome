@@ -154,6 +154,22 @@
   .toggle.on { background: var(--on); }
   .toggle.on span { transform: translateX(21px); }
   .toggle:disabled { opacity: 0.5; cursor: wait; }
+  .pulse-row { margin-top: 12px; }
+  .pulse-btn {
+    width: 100%;
+    height: 30px;
+    padding: 0 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: none;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+  }
+  .pulse-btn:hover { color: var(--accent); border-color: var(--accent); background: var(--surface-hover); }
+  .pulse-btn:disabled { opacity: 0.5; cursor: wait; }
   .empty { color: var(--off); font-size: 13px; }
   button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .icon-btn {
@@ -445,8 +461,15 @@ const GEAR_ICON = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" s
 
 function switchCard(entity) {
   const on = entity.state === "on";
+  const pulse = entity.attributes.pulse_duration;
   const classes = ["card", on ? "on" : "", entity.available ? "" : "offline"].filter(Boolean).join(" ");
   const label = entity.available ? (on ? "On" : "Off") : "Unavailable";
+  const pulseRow = pulse
+    ? `<div class="pulse-row">
+         <button class="pulse-btn" type="button" data-action="pulse"
+                 aria-label="Switch ${escapeHtml(entity.name)} on for ${pulse} seconds">Pulse for ${pulse}s</button>
+       </div>`
+    : "";
   return `
     <article class="${classes}" data-entity-id="${escapeHtml(entity.entity_id)}">
       <div class="card-head">
@@ -465,6 +488,7 @@ function switchCard(entity) {
         </div>
       </div>
       <div class="state-line"><span class="dot"></span>${label}</div>
+      ${pulseRow}
     </article>`;
 }
 
@@ -694,6 +718,28 @@ document.addEventListener("click", async (event) => {
   }
 });
 
+document.addEventListener("click", async (event) => {
+  const button = event.target.closest('[data-action="pulse"]');
+  if (!button) return;
+  const card = button.closest("[data-entity-id]");
+  const entity = entities.get(card.dataset.entityId);
+  if (!entity) return;
+  const duration = entity.attributes.pulse_duration;
+  if (!duration) return;
+  button.disabled = true;
+  try {
+    const updated = await api(`/api/entities/${encodeURIComponent(entity.entity_id)}/set`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ state: "on", duration }),
+    });
+    updateEntity(updated);
+  } catch (error) {
+    if (error.message !== "unauthorized") toast(`${entity.name}: ${error.message}`);
+    button.disabled = false;
+  }
+});
+
 const DEVICE_FIELDS = [
   { key: "host", label: "Host", type: "text" },
   { key: "port", label: "Port", type: "int" },
@@ -710,6 +756,7 @@ const ENTITY_FIELDS = {
     { key: "command_off", label: "Command off", type: "int", attr: "command_off" },
     { key: "verify_delay", label: "Verify delay (s)", type: "number", attr: "verify_delay" },
     { key: "scan_interval", label: "Scan interval (s)", type: "number", attr: "scan_interval" },
+    { key: "pulse_duration", label: "Pulse duration (s)", type: "number", attr: "pulse_duration", nullable: true },
   ],
   sensor: [
     { key: "name", label: "Name", type: "text", wide: true },

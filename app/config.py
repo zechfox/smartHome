@@ -34,6 +34,7 @@ class SwitchConfig(BaseModel):
     command_off: int = 0
     verify_delay: float = Field(default=0.0, ge=0)
     scan_interval: Optional[float] = Field(default=None, gt=0)
+    pulse_duration: Optional[float] = Field(default=None, gt=0)
 
     @property
     def display_name(self) -> str:

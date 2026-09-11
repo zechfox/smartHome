@@ -9,6 +9,7 @@ from app.config import (
     ConfigError,
     ModbusDeviceConfig,
     SensorConfig,
+    SwitchConfig,
     load_config,
     save_config,
     validated_update,
@@ -108,6 +109,13 @@ def test_struct_alias_and_register_count():
     assert sensor.register_count == 3
     assert SensorConfig(id="y", address=1, data_type="int32").register_count == 2
     assert SensorConfig(id="z", address=1).register_count == 1
+
+
+def test_switch_pulse_duration_is_optional_and_positive():
+    assert SwitchConfig(id="x", address=1).pulse_duration is None
+    assert SwitchConfig(id="x", address=1, pulse_duration=10).pulse_duration == 10
+    with pytest.raises(ValueError):
+        SwitchConfig(id="x", address=1, pulse_duration=0)
 
 
 def test_validated_update_rejects_unknown_keys():

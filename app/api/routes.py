@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, Field, ValidationError, model_validator
 
 from app.auth import make_token_dependency
 from app.modbus.client import ModbusError
@@ -14,6 +14,13 @@ from app.system import SmartHomeSystem
 
 class SetStateRequest(BaseModel):
     state: Literal["on", "off"]
+    duration: Optional[float] = Field(default=None, gt=0)
+
+    @model_validator(mode="after")
+    def _duration_requires_on(self) -> SetStateRequest:
+        if self.duration is not None and self.state != "on":
+            raise ValueError("duration is only valid when state is 'on'")
+        return self
 
 
 def create_api_router(system: SmartHomeSystem, token: str) -> APIRouter:
@@ -97,7 +104,9 @@ def create_api_router(system: SmartHomeSystem, token: str) -> APIRouter:
                 detail=f"entity {entity_id} is not controllable",
             )
         try:
-            updated = await system.set_switch(entity_id, body.state == "on")
+            updated = await system.set_switch(
+                entity_id, body.state == "on", body.duration
+            )
         except ModbusError as exc:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY, detail=f"modbus error: {exc}"

@@ -25,7 +25,15 @@ logger = logging.getLogger(__name__)
 DeviceFactory = Callable[[ModbusDeviceConfig], ModbusDevice]
 
 SWITCH_FIELDS = frozenset(
-    {"address", "command_on", "command_off", "verify_delay", "scan_interval", "name"}
+    {
+        "address",
+        "command_on",
+        "command_off",
+        "verify_delay",
+        "scan_interval",
+        "pulse_duration",
+        "name",
+    }
 )
 SENSOR_FIELDS = frozenset({"address", "scan_interval", "scale", "precision", "unit", "name"})
 DEVICE_FIELDS = frozenset({"host", "port", "slave", "timeout", "reconnect_interval"})
@@ -40,6 +48,7 @@ def _switch_attributes(device_name: str, cfg: SwitchConfig) -> dict[str, Any]:
         "command_off": cfg.command_off,
         "verify_delay": cfg.verify_delay,
         "scan_interval": cfg.scan_interval,
+        "pulse_duration": cfg.pulse_duration,
     }
 
 
@@ -101,6 +110,10 @@ class SmartHomeSystem:
             await asyncio.gather(*self._tasks, return_exceptions=True)
         self._tasks.clear()
         await asyncio.gather(
+            *(switch.flush_pending_off() for switch in self.switches.values()),
+            return_exceptions=True,
+        )
+        await asyncio.gather(
             *(device.close() for device in self.devices.values()),
             return_exceptions=True,
         )
@@ -111,10 +124,12 @@ class SmartHomeSystem:
     async def refresh_switches(self) -> None:
         await asyncio.gather(*(switch.refresh() for switch in self.switches.values()))
 
-    async def set_switch(self, entity_id: str, on: bool) -> Entity:
+    async def set_switch(
+        self, entity_id: str, on: bool, duration: Optional[float] = None
+    ) -> Entity:
         switch = self.switches[entity_id]
         if on:
-            await switch.turn_on()
+            await switch.turn_on(duration)
         else:
             await switch.turn_off()
         entity = self.store.get(entity_id)

@@ -11,6 +11,16 @@ from fastapi.testclient import TestClient
 from app.main import create_app
 
 
+def wait_for_state(client, headers, entity_id, state, timeout=2.0):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        entity = client.get(f"/api/entities/{entity_id}", headers=headers).json()
+        if entity["state"] == state:
+            return entity
+        time.sleep(0.02)
+    raise AssertionError(f"{entity_id} did not reach state {state!r}")
+
+
 def test_health_without_auth(client):
     response = client.get("/api/health")
     assert response.status_code == 200
@@ -99,6 +109,59 @@ def test_set_holding_switch_with_verify(client, auth_headers, devices):
     )
     assert response.json()["state"] == "off"
     assert devices[0].registers[1] == 0
+
+
+def test_set_with_duration_auto_off(client, auth_headers, devices):
+    response = client.post(
+        "/api/entities/switch.lock/set",
+        json={"state": "on", "duration": 0.05},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["state"] == "on"
+    assert devices[0].coils[2] is True
+
+    wait_for_state(client, auth_headers, "switch.lock", "off")
+    assert devices[0].coils[2] is False
+
+
+def test_configured_pulse_duration_auto_off(client, auth_headers, devices):
+    client.patch(
+        "/api/entities/switch.lock",
+        json={"pulse_duration": 0.05},
+        headers=auth_headers,
+    )
+    response = client.post(
+        "/api/entities/switch.lock/set", json={"state": "on"}, headers=auth_headers
+    )
+    assert response.json()["state"] == "on"
+
+    wait_for_state(client, auth_headers, "switch.lock", "off")
+    assert devices[0].coils[2] is False
+
+
+def test_request_duration_overrides_config(client, auth_headers, devices):
+    client.patch(
+        "/api/entities/switch.lock",
+        json={"pulse_duration": 60},
+        headers=auth_headers,
+    )
+    client.post(
+        "/api/entities/switch.lock/set",
+        json={"state": "on", "duration": 0.05},
+        headers=auth_headers,
+    )
+    wait_for_state(client, auth_headers, "switch.lock", "off")
+    assert devices[0].coils[2] is False
+
+
+def test_set_duration_requires_on(client, auth_headers):
+    response = client.post(
+        "/api/entities/switch.lock/set",
+        json={"state": "off", "duration": 5},
+        headers=auth_headers,
+    )
+    assert response.status_code == 422
 
 
 def test_set_sensor_rejected(client, auth_headers):
@@ -230,6 +293,21 @@ def test_patch_switch_param(client, auth_headers, config):
     system = client.app.state.system
     assert system.switches["switch.lock"].config.scan_interval == 15
     assert config.modbus[0].switches[0].scan_interval == 15
+
+
+def test_patch_switch_pulse_duration(client, auth_headers, config):
+    response = client.patch(
+        "/api/entities/switch.lock", json={"pulse_duration": 30}, headers=auth_headers
+    )
+    assert response.status_code == 200
+    assert response.json()["attributes"]["pulse_duration"] == 30
+    assert config.modbus[0].switches[0].pulse_duration == 30
+
+    response = client.patch(
+        "/api/entities/switch.lock", json={"pulse_duration": None}, headers=auth_headers
+    )
+    assert response.status_code == 200
+    assert config.modbus[0].switches[0].pulse_duration is None
 
 
 def test_patch_device_param(client, auth_headers, config, devices):

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from typing import Optional
 
 from app.config import SwitchConfig
 from app.modbus.client import ModbusDevice, ModbusError
@@ -19,15 +20,58 @@ class ModbusSwitch:
         self.store = store
         self.entity_id = f"switch.{config.id}"
         self._wake = asyncio.Event()
+        self._off_task: Optional[asyncio.Task[None]] = None
 
     def notify_change(self) -> None:
         self._wake.set()
 
-    async def turn_on(self) -> None:
+    def cancel_pending_off(self) -> None:
+        if self._off_task is not None:
+            self._off_task.cancel()
+            self._off_task = None
+
+    async def flush_pending_off(self) -> None:
+        """Turn off now if an auto-off is pending (used on shutdown)."""
+        if self._off_task is None:
+            return
+        self.cancel_pending_off()
+        try:
+            await self._write(False)
+        except ModbusError:
+            pass
+
+    async def turn_on(self, duration: Optional[float] = None) -> None:
+        """Switch on, optionally switching off again after ``duration`` seconds.
+
+        ``duration`` overrides the configured ``pulse_duration``. The countdown
+        starts when the command is issued, not after the verify read.
+        """
+        self.cancel_pending_off()
+        effective = duration if duration is not None else self.config.pulse_duration
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + effective if effective else None
         await self._write(True)
+        if deadline is not None:
+            remaining = deadline - loop.time()
+            if remaining <= 0:
+                await self._write(False)
+            else:
+                self._off_task = asyncio.create_task(self._auto_off(remaining))
 
     async def turn_off(self) -> None:
+        self.cancel_pending_off()
         await self._write(False)
+
+    async def _auto_off(self, duration: float) -> None:
+        try:
+            await asyncio.sleep(duration)
+            await self._write(False)
+        except asyncio.CancelledError:
+            raise
+        except ModbusError:
+            pass
+        finally:
+            self._off_task = None
 
     async def run(self) -> None:
         while True:
